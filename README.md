@@ -1,6 +1,6 @@
 # Bonjour, je suis Shtwessie 👋
 
-**Gestionnaire Ops & Data** · *Automatiser l'essentiel, structurer la complexité.*
+**Gestionnaire | Facturation, RH & automatisation**
 
 Gestionnaire administrative dans une ESN, j'assure le suivi administratif d'environ **600 consultants répartis sur 15 sociétés** : consolidation mensuelle de la facturation, contrôle des données, commissions de cooptation. J'automatise ce qui peut l'être (**n8n**, **Claude**) et je m'oriente vers la **coordination et la gestion de projet**.
 
@@ -21,7 +21,7 @@ Gestionnaire administrative dans une ESN, j'assure le suivi administratif d'envi
 
 ### Outils
 
-`n8n` · `Claude` · `Excel / Google Sheets` · `Power BI (DAX, Power Query)` · `Gmail` · `Qonto` · `Canva`
+`n8n` · `Claude` · `Excel / Google Sheets` · `Power Query` · `Power BI (DAX)` · `Gmail` · `Qonto` · `Canva`
 
 ### Certifications
 
@@ -35,4 +35,4 @@ Français (langue maternelle) · Anglais (courant)
 
 ---
 
-<sub>🇬🇧 Ops & Data specialist at an IT consulting firm — automating workflows with n8n and Claude, moving into project coordination. Portfolio: [shtwessie.github.io/kim-os](https://shtwessie.github.io/kim-os/)</sub>
+<sub>🇬🇧 Operations specialist (billing, HR & automation) at an IT consulting firm — automating workflows with n8n and Claude, moving into project coordination. Portfolio: [shtwessie.github.io/kim-os](https://shtwessie.github.io/kim-os/)</sub>
