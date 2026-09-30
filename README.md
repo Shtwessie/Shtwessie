@@ -18,7 +18,7 @@ Gestionnaire administrative dans une ESN, j'assure le suivi administratif d'envi
 | 📊 | **Clôture mensuelle multi-entités** | Consolidation de 15 sociétés, formules de contrôle (écarts de TJM, consultants manquants) |
 | 📋 | **Tableaux de suivi** | 3 tableaux clairs à la place de fichiers obsolètes, utilisés par toutes les équipes |
 | 📈 | **Tableau de bord Excel & Power BI** | 9 feuilles reliées, KPI calculés par formules, script DAX et thème Power BI |
-| 🎓 | **[Parcours contrôle de gestion Altiplan](https://github.com/Shtwessie/altiplan-controle-de-gestion)** | 12 missions Odoo + Excel sur une entreprise fictive B2B : analytique, coût moyen, Factur-X, FAE/PCA, budget et écarts, DSO. [Site](https://shtwessie.odoo.com/) et [cours en ligne](https://shtwessie.odoo.com/slides/1) |
+| 🎓 | **[Parcours contrôle de gestion Altiplan](https://github.com/Shtwessie/altiplan-controle-de-gestion)** | 12 missions Odoo + Excel sur une entreprise fictive B2B, conçues avec Claude : analytique, coût moyen, Factur-X, FAE/PCA, budget et écarts, DSO. [Site](https://shtwessie.odoo.com/) et [cours en ligne](https://shtwessie.odoo.com/slides/1) |
 
 ### Outils
 
