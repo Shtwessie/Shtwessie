@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Générateur CRA & Télétravail</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{--b:#1F3864;--tt:#2e7d32;--g:#eef1f6}
+  *{box-sizing:border-box}
+  body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#f5f6fa;color:#222}
+  .wrap{max-width:900px;margin:0 auto;padding:20px}
+  h1{color:var(--b);font-size:22px;margin:0 0 4px}
+  .sub{color:#666;font-size:13px;margin-bottom:18px}
+  .card{background:#fff;border-radius:10px;padding:18px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .card h2{font-size:15px;margin:0 0 12px;color:var(--b)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
+  label{font-size:12px;color:#555;display:block;margin-bottom:3px}
+  input{width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:14px}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;font-size:12px}
+  .chip{padding:5px 10px;border-radius:14px;border:2px solid transparent;cursor:pointer;user-select:none}
+  .chip.on{border-color:#222}
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+  .dow{font-size:11px;text-align:center;color:#777;font-weight:bold}
+  .day{min-height:58px;border-radius:7px;padding:5px;font-size:12px;cursor:pointer;border:1px solid #ddd;background:#fff}
+  .day .n{font-weight:bold;font-size:14px}
+  .day .s{font-size:10px;margin-top:4px}
+  .day.off{background:#e6e6e6;color:#999;cursor:default}
+  .day.empty{border:none;background:none;cursor:default}
+  .totals{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+  .tot{background:var(--g);border-radius:8px;padding:8px 12px;font-size:13px}
+  .tot b{font-size:16px;color:var(--b)}
+  .btns{display:flex;flex-wrap:wrap;gap:10px}
+  button{background:var(--b);color:#fff;border:0;border-radius:8px;padding:12px 18px;font-size:14px;cursor:pointer}
+  button.sec{background:#fff;color:var(--b);border:2px solid var(--b)}
+  .help{font-size:12px;color:#666;margin-top:8px}
+  textarea{width:100%;height:150px;font-family:Arial;font-size:13px;padding:8px;border:1px solid #ccc;border-radius:6px}
+  @media(max-width:600px){.grid{grid-template-columns:1fr}.day{min-height:46px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Générateur CRA & Télétravail</h1>
+  <div class="sub">1. Vérifie tes infos · 2. Clique sur tes jours de télétravail / absences · 3. Télécharge le CRA à faire signer et tes jours sur site</div>
+
+  <div class="card">
+    <h2>1. Mes infos (gardées en mémoire pour le mois prochain)</h2>
+    <div class="grid">
+      <div><label>Mon nom</label><input id="nom" placeholder="Prénom NOM"></div>
+      <div><label>Ma société</label><input id="societe"></div>
+      <div><label>Client</label><input id="client" placeholder="Bpifrance"></div>
+      <div><label>Mission / projet</label><input id="mission"></div>
+      <div><label>Responsable (signe le CRA)</label><input id="resp"></div>
+            <div><label>Mois</label><input id="mois" type="month"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2. Mes jours</h2>
+    <div class="legend" id="legend"></div>
+    <div class="help" style="margin:-4px 0 10px">Choisis un statut ci-dessus, puis clique sur les jours concernés. Par défaut, tous les jours ouvrés sont « Sur site ». Week-ends et jours fériés sont grisés automatiquement.</div>
+    <div class="cal" id="cal"></div>
+    <div class="totals" id="totals"></div>
+  </div>
+
+  <div class="card">
+    <h2>3. Mes documents</h2>
+    <div class="btns">
+      <button onclick="pdfCRA()">📄 Télécharger le CRA (PDF)</button>
+      <button onclick="pdfTT()">🏢 Télécharger mes jours sur site (PDF)</button>
+      <button class="sec" onclick="resetMonth()">Remettre le mois à zéro</button>
+    </div>
+    <div class="help">Le CRA contient les cadres de signature (toi + ta responsable). Le PDF « jours sur site » est une simple information, sans signature.</div>
+    <h2 style="margin-top:18px">Mail à envoyer</h2>
+    <textarea id="mail" readonly></textarea>
+    <div class="btns" style="margin-top:8px"><button class="sec" onclick="copyMail()">Copier le mail</button></div>
+  </div>
+</div>
+
+<script>
+const STATUTS = {
+  "Sur site":    {c:"#ffffff", t:1, short:"Site"},
+  "Télétravail": {c:"#c8e6c9", t:1, short:"TT"},
+  "½ site / ½ TT": {c:"#e3f2d0", t:1, short:"½ TT"},
+  "Demi-journée": {c:"#fff3c4", t:0.5, short:"½ j"},
+  "Congé payé":  {c:"#bbdefb", t:0, short:"CP"},
+  "RTT":         {c:"#d1c4e9", t:0, short:"RTT"},
+  "Maladie":     {c:"#ffcdd2", t:0, short:"Maladie"},
+  "Absence":     {c:"#ffe0b2", t:0, short:"Abs."},
+  "Formation":   {c:"#b2ebf2", t:1, short:"Form."}
+};
+const MOIS=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+const JOURS=["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
+let current="Télétravail";
+let days={}; // "YYYY-MM-DD" -> statut
+const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+function easter(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;return new Date(y,mo-1,da)}
+function feries(y){const e=easter(y),add=n=>{const d=new Date(e);d.setDate(d.getDate()+n);return d};
+  const list=[new Date(y,0,1),add(1),new Date(y,4,1),new Date(y,4,8),add(39),add(50),new Date(y,6,14),new Date(y,7,15),new Date(y,10,1),new Date(y,10,11),new Date(y,11,25)];
+  return new Set(list.map(key))}
+function key(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function fmt(d){return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear()}
+function ym(){const v=document.getElementById("mois").value.split("-");return {y:+v[0],m:+v[1]-1}}
+function periode(){const {y,m}=ym();return MOIS[m]+" "+y}
+const F=["nom","societe","client","mission","resp"];
+const DEF={nom:"Shtwessie DUMAY",societe:"",client:"Freelance.com",mission:"ADV",resp:"Anne-Laure"};
+function val(id){return document.getElementById(id).value.trim()}
+
+function monthDays(){const {y,m}=ym(),fe=feries(y),n=new Date(y,m+1,0).getDate(),out=[];
+  for(let i=1;i<=n;i++){const d=new Date(y,m,i),k=key(d),we=d.getDay()===0||d.getDay()===6,fer=fe.has(k);
+    out.push({d,k,off:we||fer,offLabel:we?"Week-end":(fer?"Férié":""),statut:(we||fer)?(we?"Week-end":"Férié"):(days[k]||"Sur site")})}
+  return out}
+
+function render(){
+  const lg=document.getElementById("legend");lg.innerHTML="";
+  Object.keys(STATUTS).forEach(s=>{const c=document.createElement("span");c.className="chip"+(s===current?" on":"");c.style.background=STATUTS[s].c;if(s==="Sur site")c.style.border=s===current?"2px solid #222":"2px solid #ccc";c.textContent=s;c.onclick=()=>{current=s;render()};lg.appendChild(c)});
+  const cal=document.getElementById("cal");cal.innerHTML="";
+  ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"].forEach(x=>{const e=document.createElement("div");e.className="dow";e.textContent=x;cal.appendChild(e)});
+  const md=monthDays(),shift=(md[0].d.getDay()+6)%7;
+  for(let i=0;i<shift;i++){const e=document.createElement("div");e.className="day empty";cal.appendChild(e)}
+  md.forEach(x=>{const e=document.createElement("div");e.className="day"+(x.off?" off":"");
+    e.innerHTML='<div class="n">'+x.d.getDate()+'</div><div class="s">'+(x.off?x.offLabel:STATUTS[x.statut].short)+'</div>';
+    if(!x.off){e.style.background=STATUTS[x.statut].c;e.onclick=()=>{days[x.k]=(days[x.k]===current&&current!=="Sur site")?"Sur site":current;save();render()}}
+    cal.appendChild(e)});
+  const t=totals();
+  document.getElementById("totals").innerHTML=
+    `<div class="tot">Jours travaillés<br><b>${t.trav}</b></div><div class="tot">dont sur site<br><b>${t.site}</b></div><div class="tot">dont télétravail<br><b>${t.tt}</b></div>`+
+    `<div class="tot">Congés<br><b>${t.cp}</b></div><div class="tot">RTT<br><b>${t.rtt}</b></div><div class="tot">Maladie / absence<br><b>${t.mal+t.abs}</b></div><div class="tot">Jours ouvrés du mois<br><b>${t.ouvres}</b></div>`;
+  updateMail(t);
+}
+function totals(){const md=monthDays();let r={trav:0,site:0,tt:0,cp:0,rtt:0,mal:0,abs:0,ouvres:0};
+  md.forEach(x=>{if(x.off)return;r.ouvres++;const s=x.statut;r.trav+=STATUTS[s].t;
+    if(s==="Télétravail")r.tt+=1;if(s==="½ site / ½ TT"){r.tt+=0.5;r.site+=0.5}if(s==="Sur site")r.site+=1;if(s==="Demi-journée")r.site+=0.5;if(s==="Congé payé")r.cp++;if(s==="RTT")r.rtt++;if(s==="Maladie")r.mal++;if(s==="Absence")r.abs++;if(s==="Demi-journée")r.abs+=0.5});
+  return r}
+function n(v){return String(v).replace(".",",")}
+function ttList(){return monthDays().filter(x=>!x.off&&(x.statut==="Télétravail"||x.statut==="½ site / ½ TT"))}
+
+function updateMail(t){
+  const site=siteList().map(x=>"- "+JOURS[x.d.getDay()]+" "+fmt(x.d)+(x.statut==="Sur site"?"":" ("+x.statut+")")).join("\n");
+  document.getElementById("mail").value=
+`Objet : CRA ${periode()} – ${val("nom")} – signature + jours sur site
+
+Bonjour ${val("resp")||"[responsable]"},
+
+Vous trouverez ci-joint mon compte rendu d'activité pour ${periode()}${val("mission")?" (mission "+val("mission")+")":""}.
+Total : ${n(t.trav)} jour(s) travaillé(s), dont ${n(t.site)} sur site et ${n(t.tt)} en télétravail.
+Pourriez-vous le signer et me le retourner ?
+
+Pour information, je serai sur site les jours suivants :
+${site||"- aucun jour sur site ce mois-ci"}
+
+Merci d'avance, bien cordialement,
+${val("nom")}`}
+function siteList(){return monthDays().filter(x=>!x.off&&["Sur site","½ site / ½ TT","Demi-journée"].includes(x.statut))}
+function copyMail(){const m=document.getElementById("mail");m.select();try{navigator.clipboard.writeText(m.value)}catch(e){document.execCommand("copy")}}
+
+function save(){const info={};F.forEach(f=>info[f]=val(f));store.set("cra_info",info);store.set("cra_days",days);store.set("cra_mois",document.getElementById("mois").value)}
+function resetMonth(){const {y,m}=ym();Object.keys(days).forEach(k=>{if(k.startsWith(y+"-"+String(m+1).padStart(2,"0")))delete days[k]});save();render()}
+
+/* ---------- PDF ---------- */
+function newDoc(){if(!window.jspdf){alert("Connexion internet nécessaire pour générer le PDF.");return null}return new window.jspdf.jsPDF({unit:"mm",format:"a4"})}
+const BLUE=[31,56,100];
+function header(doc,title){
+  doc.setFillColor(...BLUE);doc.rect(0,0,210,24,"F");
+  doc.setTextColor(255);doc.setFont("helvetica","bold");doc.setFontSize(16);doc.text(title,105,12,{align:"center"});
+  doc.setFontSize(11);doc.setFont("helvetica","normal");doc.text("Période : "+periode(),105,19,{align:"center"});
+  doc.setTextColor(0)}
+function infoBlock(doc,y,rows){doc.setFontSize(10);rows.forEach(([l,v],i)=>{doc.setFillColor(217,225,242);doc.rect(15,y+i*7,50,7,"F");doc.rect(15,y+i*7,180,7);
+  doc.setFont("helvetica","bold");doc.text(l,17,y+i*7+4.8);doc.setFont("helvetica","normal");doc.text(v||"",68,y+i*7+4.8)});return y+rows.length*7}
+function sigBoxes(doc,y,boxes){const w=88;boxes.forEach((b,i)=>{const x=15+i*(w+4);
+  doc.setFillColor(...BLUE);doc.rect(x,y,w,7,"F");doc.setTextColor(255);doc.setFont("helvetica","bold");doc.setFontSize(10);doc.text(b.title,x+w/2,y+4.8,{align:"center"});doc.setTextColor(0);
+  doc.setFont("helvetica","normal");doc.setFontSize(9);doc.rect(x,y,w,45);
+  doc.text("Nom : "+(b.name||""),x+2,y+12);doc.text(b.extra||"Date :",x+2,y+18);doc.setFont("helvetica","italic");doc.text("Signature :",x+2,y+24)})}
+function fileName(t){return t+"_"+periode().replace(" ","_")+"_"+(val("nom")||"consultant").replace(/\s+/g,"_")+".pdf"}
+
+function pdfCRA(){save();const doc=newDoc();if(!doc)return;header(doc,"COMPTE RENDU D'ACTIVITÉ");
+  let y=infoBlock(doc,30,[["Consultant",val("nom")],["Société",val("societe")],["Client",val("client")],["Mission",val("mission")],["Responsable",val("resp")]])+5;
+  const cols=[[15,28,"Date"],[43,27,"Jour"],[70,40,"Statut"],[110,25,"Temps"],[135,60,""]];
+  doc.setFillColor(...BLUE);doc.rect(15,y,180,6,"F");doc.setTextColor(255);doc.setFont("helvetica","bold");doc.setFontSize(9);
+  cols.forEach(c=>c[2]&&doc.text(c[2],c[0]+c[1]/2,y+4.2,{align:"center"}));doc.setTextColor(0);y+=6;
+  doc.setFont("helvetica","normal");doc.setFontSize(8.5);const rh=5;
+  monthDays().forEach(x=>{if(x.off){doc.setFillColor(235,235,235);doc.rect(15,y,180,rh,"F")}
+    else if(x.statut==="Télétravail"||x.statut==="½ site / ½ TT"){doc.setFillColor(226,239,218);doc.rect(15,y,180,rh,"F")}
+    doc.rect(15,y,180,rh);const t=x.off?"-":n(STATUTS[x.statut].t);
+    [[fmt(x.d)],[JOURS[x.d.getDay()]],[x.statut],[t]].forEach((v,i)=>doc.text(v[0],cols[i][0]+cols[i][1]/2,y+3.6,{align:"center"}));y+=rh});
+  y+=5;const t=totals();
+  const rec=[["Jours travaillés",t.trav],["dont télétravail",t.tt],["Congés payés",t.cp],["RTT",t.rtt],["Maladie / absence",t.mal+t.abs]];
+  doc.setFontSize(9);rec.forEach(([l,v],i)=>{const x=15+i*36;doc.setFillColor(217,225,242);doc.rect(x,y,36,6,"F");doc.rect(x,y,36,12);
+    doc.setFont("helvetica","bold");doc.text(l,x+18,y+4.2,{align:"center"});doc.setFontSize(11);doc.text(n(v),x+18,y+10.3,{align:"center"});doc.setFontSize(9)});
+  y+=18;sigBoxes(doc,y,[{title:"LE CONSULTANT",name:val("nom")},{title:"RESPONSABLE — BON POUR ACCORD",name:val("resp")}]);
+  doc.setFont("helvetica","italic");doc.setFontSize(8);doc.text("Merci de dater, signer et retourner ce CRA.",15,y+51);
+  doc.save(fileName("CRA"))}
+
+function pdfTT(){save();const doc=newDoc();if(!doc)return;header(doc,"JOURS DE PRÉSENCE SUR SITE");
+  let y=infoBlock(doc,30,[["Consultant",val("nom")],["Client",val("client")],["Mission",val("mission")],["Destinataire",val("resp")]])+8;
+  const L=siteList(),t=totals();
+  doc.setFont("helvetica","normal");doc.setFontSize(10);
+  doc.text(doc.splitTextToSize(`Pour information, voici mes jours de présence sur site pour ${periode()} (${n(t.site)} jour(s)). Les autres jours ouvrés sont en télétravail${t.cp+t.rtt+t.mal+t.abs>0?" ou en absence":""}.`,180),15,y);y+=12;
+  doc.setFillColor(...BLUE);doc.rect(15,y,180,7,"F");doc.setTextColor(255);doc.setFont("helvetica","bold");
+  [["N°",25],["Date",65],["Jour",110],["Présence",165]].forEach(([h,x])=>doc.text(h,x,y+4.8,{align:"center"}));doc.setTextColor(0);y+=7;doc.setFont("helvetica","normal");
+  if(!L.length){doc.rect(15,y,180,7);doc.text("Aucun jour sur site ce mois-ci",105,y+4.8,{align:"center"});y+=7}
+  L.forEach((x,i)=>{if(y>275){doc.addPage();y=20}doc.rect(15,y,180,7);
+    const pres=x.statut==="Sur site"?"Journée":"Demi-journée";
+    [[String(i+1),25],[fmt(x.d),65],[JOURS[x.d.getDay()],110],[pres,165]].forEach(([v,cx])=>doc.text(v,cx,y+4.8,{align:"center"}));y+=7});
+  doc.setFillColor(217,225,242);doc.rect(15,y,180,7,"F");doc.rect(15,y,180,7);doc.setFont("helvetica","bold");
+  doc.text("Total : "+n(t.site)+" jour(s) sur site  ·  "+n(t.tt)+" jour(s) en télétravail",105,y+4.8,{align:"center"});
+  doc.save(fileName("Jours_sur_site"))}
+
+/* ---------- init ---------- */
+(function init(){const info=store.get("cra_info")||{};F.forEach(f=>{const e=document.getElementById(f);e.value=info[f]||DEF[f]||"";e.addEventListener("input",()=>{save();updateMail(totals())})});
+  days=store.get("cra_days")||{};const now=new Date();
+  document.getElementById("mois").value=store.get("cra_mois")||(now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0"));
+  document.getElementById("mois").addEventListener("change",()=>{save();render()});render()})();
+</script>
+</body>
+</html>
