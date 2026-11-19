@@ -67,10 +67,10 @@
     <h2>3. Mes documents</h2>
     <div class="btns">
       <button onclick="pdfCRA()">📄 Télécharger le CRA (PDF)</button>
-      <button onclick="pdfTT()">🏢 Télécharger mes jours sur site (PDF)</button>
+      <button onclick="pdfTT()">🏠 Télécharger mes jours de télétravail (PDF)</button>
       <button class="sec" onclick="resetMonth()">Remettre le mois à zéro</button>
     </div>
-    <div class="help">Le CRA contient les cadres de signature (toi + ta responsable). Le PDF « jours sur site » est une simple information, sans signature.</div>
+    <div class="help">Le CRA contient les cadres de signature (toi + ta responsable). Le PDF « jours de télétravail » est une simple information, sans signature.</div>
     <h2 style="margin-top:18px">Mail à envoyer</h2>
     <textarea id="mail" readonly></textarea>
     <div class="btns" style="margin-top:8px"><button class="sec" onclick="copyMail()">Copier le mail</button></div>
@@ -137,9 +137,9 @@ function n(v){return String(v).replace(".",",")}
 function ttList(){return monthDays().filter(x=>!x.off&&(x.statut==="Télétravail"||x.statut==="½ site / ½ TT"))}
 
 function updateMail(t){
-  const site=siteList().map(x=>"- "+JOURS[x.d.getDay()]+" "+fmt(x.d)+(x.statut==="Sur site"?"":" ("+x.statut+")")).join("\n");
+  const ttj=ttList().map(x=>"- "+JOURS[x.d.getDay()]+" "+fmt(x.d)+(x.statut==="Télétravail"?"":" (demi-journée)")).join("\n");
   document.getElementById("mail").value=
-`Objet : CRA ${periode()} – ${val("nom")} – signature + jours sur site
+`Objet : CRA ${periode()} – ${val("nom")} – signature
 
 Bonjour ${val("resp")||"[responsable]"},
 
@@ -147,8 +147,8 @@ Vous trouverez ci-joint mon compte rendu d'activité pour ${periode()}${val("mis
 Total : ${n(t.trav)} jour(s) travaillé(s), dont ${n(t.site)} sur site et ${n(t.tt)} en télétravail.
 Pourriez-vous le signer et me le retourner ?
 
-Pour information, je serai sur site les jours suivants :
-${site||"- aucun jour sur site ce mois-ci"}
+Pour information, j'ai été en télétravail les jours suivants :
+${ttj||"- aucun jour de télétravail ce mois-ci"}
 
 Merci d'avance, bien cordialement,
 ${val("nom")}`}
@@ -192,20 +192,20 @@ function pdfCRA(){save();const doc=newDoc();if(!doc)return;header(doc,"COMPTE RE
   doc.setFont("helvetica","italic");doc.setFontSize(8);doc.text("Merci de dater, signer et retourner ce CRA.",15,y+51);
   doc.save(fileName("CRA"))}
 
-function pdfTT(){save();const doc=newDoc();if(!doc)return;header(doc,"JOURS DE PRÉSENCE SUR SITE");
+function pdfTT(){save();const doc=newDoc();if(!doc)return;header(doc,"JOURS DE TÉLÉTRAVAIL");
   let y=infoBlock(doc,30,[["Consultant",val("nom")],["Client",val("client")],["Mission",val("mission")],["Destinataire",val("resp")]])+8;
-  const L=siteList(),t=totals();
+  const L=ttList(),t=totals();
   doc.setFont("helvetica","normal");doc.setFontSize(10);
-  doc.text(doc.splitTextToSize(`Pour information, voici mes jours de présence sur site pour ${periode()} (${n(t.site)} jour(s)). Les autres jours ouvrés sont en télétravail${t.cp+t.rtt+t.mal+t.abs>0?" ou en absence":""}.`,180),15,y);y+=12;
+  doc.text(doc.splitTextToSize(`Pour information, j'ai été en télétravail les jours suivants pour ${periode()} (${n(t.tt)} jour(s)).`,180),15,y);y+=12;
   doc.setFillColor(...BLUE);doc.rect(15,y,180,7,"F");doc.setTextColor(255);doc.setFont("helvetica","bold");
-  [["N°",25],["Date",65],["Jour",110],["Présence",165]].forEach(([h,x])=>doc.text(h,x,y+4.8,{align:"center"}));doc.setTextColor(0);y+=7;doc.setFont("helvetica","normal");
-  if(!L.length){doc.rect(15,y,180,7);doc.text("Aucun jour sur site ce mois-ci",105,y+4.8,{align:"center"});y+=7}
+  [["N°",25],["Date",65],["Jour",110],["Durée",165]].forEach(([h,x])=>doc.text(h,x,y+4.8,{align:"center"}));doc.setTextColor(0);y+=7;doc.setFont("helvetica","normal");
+  if(!L.length){doc.rect(15,y,180,7);doc.text("Aucun jour de télétravail ce mois-ci",105,y+4.8,{align:"center"});y+=7}
   L.forEach((x,i)=>{if(y>275){doc.addPage();y=20}doc.rect(15,y,180,7);
-    const pres=x.statut==="Sur site"?"Journée":"Demi-journée";
+    const pres=x.statut==="Télétravail"?"Journée":"Demi-journée";
     [[String(i+1),25],[fmt(x.d),65],[JOURS[x.d.getDay()],110],[pres,165]].forEach(([v,cx])=>doc.text(v,cx,y+4.8,{align:"center"}));y+=7});
   doc.setFillColor(217,225,242);doc.rect(15,y,180,7,"F");doc.rect(15,y,180,7);doc.setFont("helvetica","bold");
-  doc.text("Total : "+n(t.site)+" jour(s) sur site  ·  "+n(t.tt)+" jour(s) en télétravail",105,y+4.8,{align:"center"});
-  doc.save(fileName("Jours_sur_site"))}
+  doc.text("Total : "+n(t.tt)+" jour(s) de télétravail",105,y+4.8,{align:"center"});
+  doc.save(fileName("Jours_teletravail"))}
 
 /* ---------- init ---------- */
 (function init(){const info=store.get("cra_info")||{};F.forEach(f=>{const e=document.getElementById(f);e.value=info[f]||DEF[f]||"";e.addEventListener("input",()=>{save();updateMail(totals())})});
