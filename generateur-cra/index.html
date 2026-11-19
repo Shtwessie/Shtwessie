@@ -465,10 +465,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     <h2>3. Mes documents</h2>
     <div class="btns">
       <button onclick="pdfCRA()">📄 Télécharger le CRA (PDF)</button>
-      <button onclick="pdfTT()">🏠 Télécharger mes jours de télétravail (PDF)</button>
-      <button class="sec" onclick="resetMonth()">Remettre le mois à zéro</button>
+            <button class="sec" onclick="resetMonth()">Remettre le mois à zéro</button>
     </div>
-    <div class="help">Le CRA contient les cadres de signature (toi + ta responsable). Le PDF « jours de télétravail » est une simple information, sans signature.</div>
+    <div class="help" style="display:flex;align-items:center;gap:10px;margin-top:10px"><label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#222;margin:0"><input type="checkbox" id="withSig" checked style="width:auto"> Ajouter ma signature</label><img id="sigPrev" alt="" style="height:44px"></div>
     <h2 style="margin-top:18px">Mail à envoyer</h2>
     <textarea id="mail" readonly></textarea>
     <div class="btns" style="margin-top:8px"><button class="sec" onclick="copyMail()">Copier le mail</button></div>
@@ -588,7 +587,7 @@ function sig(doc,y,boxes){const g=6,w=(MW-g)/2,h=40;boxes.forEach((b,i)=>{const 
   doc.setDrawColor(...LINE);doc.setLineWidth(0.3);doc.roundedRect(x,y,w,h,2.5,2.5,"S");
   txt(doc,b.t.toUpperCase(),x+5,y+7,{s:7.5,b:1,c:ACC});txt(doc,b.n||"",x+5,y+13,{b:1,s:10.5});
   txt(doc,"Date :",x+5,y+20,{s:8.5,c:MUTED});doc.setDrawColor(...LINE);doc.line(x+16,y+20.5,x+w-5,y+20.5);
-  txt(doc,"Signature :",x+5,y+27,{s:8.5,c:MUTED})})}
+  txt(doc,"Signature :",x+5,y+27,{s:8.5,c:MUTED});if(b.sig&&SIGPNG)doc.addImage(SIGPNG,"PNG",x+24,y+20.5,38,19)})}
 function foot(doc,s){doc.setDrawColor(...LINE);doc.line(ML,284,ML+MW,284);txt(doc,s,ML,289,{s:7.5,c:MUTED});txt(doc,val("nom"),ML+MW,289,{s:7.5,c:MUTED,a:"right"})}
 function fileName(t){return t+"_"+periode().replace(" ","_")+"_"+(val("nom")||"consultant").replace(/\s+/g,"_")+".pdf"}
 
@@ -597,7 +596,7 @@ function pdfCRA(){save();const doc=newDoc();if(!doc)return;const t=totals();
   let y=infos(doc,47,[["Consultant",val("nom")],["Client",val("client")],["Mission",val("mission")],["Responsable",val("resp")]]);
   y=cards(doc,y+3,[["jours travaillés",t.trav,1],["sur site",t.site],["en télétravail",t.tt],["absences / congés",t.cp+t.rtt+t.mal+t.abs]])+10;
   y=calendar(doc,y)+8;
-  sig(doc,y,[{t:"Consultant",n:val("nom")},{t:"Responsable — bon pour accord",n:val("resp")}]);
+  sig(doc,y,[{t:"Consultant",n:val("nom"),sig:document.getElementById("withSig").checked},{t:"Responsable — bon pour accord",n:val("resp")}]);
   txt(doc,"Merci de dater, signer et retourner ce compte rendu.",ML,y+47,{i:1,s:8,c:MUTED});
   foot(doc,"Compte rendu d'activité · "+periode());
   doc.save(fileName("CRA"))}
@@ -615,6 +614,11 @@ function pdfTT(){save();const doc=newDoc();if(!doc)return;const t=totals(),L=ttL
     txt(doc,x.statut==="Télétravail"?"Journée":"Demi-journée",cx+w-4,cy+6,{s:8.5,c:[22,101,52],a:"right"})});
   foot(doc,"Jours de télétravail · "+periode());
   doc.save(fileName("Jours_teletravail"))}
+
+/* ---------- signature ---------- */
+const SIG_SVG='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 70" width="560" height="280"><g transform="skewX(-10) translate(10 0)"><g fill="none" stroke="#1e2a78" stroke-linecap="round" stroke-linejoin="round"><path d="M52 16 C 46 6, 22 6, 22 18 C 22 30, 50 28, 50 42 C 50 56, 24 58, 16 48" stroke-width="3.4"/><path d="M16 48 C 40 62, 92 60, 128 46" stroke-width="1.8"/><line x1="78" y1="44" x2="78" y2="10" stroke-width="2.6"/><path d="M78 10 C 84 18, 96 20, 92 34" stroke-width="2.6"/></g><ellipse cx="72" cy="45" rx="7" ry="4.8" transform="rotate(-22 72 45)" fill="#1e2a78"/></g></svg>';
+let SIGPNG=null;
+(function(){const url="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(SIG_SVG);document.getElementById("sigPrev").src=url;const im=new Image();im.onload=()=>{const c=document.createElement("canvas");c.width=560;c.height=280;c.getContext("2d").drawImage(im,0,0,560,280);try{SIGPNG=c.toDataURL("image/png")}catch(e){}};im.src=url})();
 
 /* ---------- init ---------- */
 (function init(){const info=store.get("cra_info")||{};F.forEach(f=>{const e=document.getElementById(f);e.value=info[f]||DEF[f]||"";e.addEventListener("input",()=>{save();updateMail(totals())})});
