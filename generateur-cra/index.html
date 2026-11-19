@@ -558,51 +558,62 @@ function resetMonth(){const {y,m}=ym();Object.keys(days).forEach(k=>{if(k.starts
 
 /* ---------- PDF ---------- */
 function newDoc(){if(!window.jspdf){alert("Le module PDF n'a pas pu se charger. Actualise la page (Ctrl+F5).");return null}return new window.jspdf.jsPDF({unit:"mm",format:"a4"})}
-const BLUE=[31,56,100];
-function header(doc,title){
-  doc.setFillColor(...BLUE);doc.rect(0,0,210,24,"F");
-  doc.setTextColor(255);doc.setFont("helvetica","bold");doc.setFontSize(16);doc.text(title,105,12,{align:"center"});
-  doc.setFontSize(11);doc.setFont("helvetica","normal");doc.text("Période : "+periode(),105,19,{align:"center"});
-  doc.setTextColor(0)}
-function infoBlock(doc,y,rows){doc.setFontSize(10);rows.forEach(([l,v],i)=>{doc.setFillColor(217,225,242);doc.rect(15,y+i*7,50,7,"F");doc.rect(15,y+i*7,180,7);
-  doc.setFont("helvetica","bold");doc.text(l,17,y+i*7+4.8);doc.setFont("helvetica","normal");doc.text(v||"",68,y+i*7+4.8)});return y+rows.length*7}
-function sigBoxes(doc,y,boxes){const w=88;boxes.forEach((b,i)=>{const x=15+i*(w+4);
-  doc.setFillColor(...BLUE);doc.rect(x,y,w,7,"F");doc.setTextColor(255);doc.setFont("helvetica","bold");doc.setFontSize(10);doc.text(b.title,x+w/2,y+4.8,{align:"center"});doc.setTextColor(0);
-  doc.setFont("helvetica","normal");doc.setFontSize(9);doc.rect(x,y,w,45);
-  doc.text("Nom : "+(b.name||""),x+2,y+12);doc.text(b.extra||"Date :",x+2,y+18);doc.setFont("helvetica","italic");doc.text("Signature :",x+2,y+24)})}
+const INK=[30,41,59],MUTED=[100,116,139],LINE=[226,232,240],ACC=[55,65,160],ACCL=[238,240,252];
+const PCOL={"Sur site":[255,255,255],"Télétravail":[209,250,229],"½ site / ½ TT":[236,252,203],"Demi-journée":[254,249,195],
+ "Congé payé":[219,234,254],"RTT":[237,233,254],"Maladie":[254,226,226],"Absence":[255,237,213],"Formation":[207,250,254]};
+const ML=18,MW=174;
+function txt(doc,s,x,y,o={}){doc.setFont("helvetica",o.b?"bold":(o.i?"italic":"normal"));doc.setFontSize(o.s||10);doc.setTextColor(...(o.c||INK));doc.text(String(s),x,y,o.a?{align:o.a}:undefined)}
+function head(doc,title){
+  txt(doc,title,ML,24,{b:1,s:19});
+  txt(doc,periode(),ML,32,{b:1,s:12,c:ACC});
+  txt(doc,val("nom"),ML+MW,24,{b:1,s:10,a:"right"});
+  txt(doc,[val("client"),val("mission")].filter(Boolean).join("  ·  "),ML+MW,30,{s:9,c:MUTED,a:"right"});
+  doc.setDrawColor(...ACC);doc.setLineWidth(0.8);doc.line(ML,37,ML+22,37);
+  doc.setDrawColor(...LINE);doc.setLineWidth(0.3);doc.line(ML+22,37,ML+MW,37);
+}
+function infos(doc,y,items){const w=MW/items.length;items.forEach(([l,v],i)=>{txt(doc,l.toUpperCase(),ML+i*w,y,{s:7.5,c:MUTED,b:1});txt(doc,v||"—",ML+i*w,y+5.5,{s:10.5,b:1})});return y+12}
+function cards(doc,y,items){const g=4,w=(MW-g*(items.length-1))/items.length;
+  items.forEach(([l,v,hl],i)=>{const x=ML+i*(w+g);doc.setFillColor(...(hl?ACC:[248,250,252]));doc.setDrawColor(...(hl?ACC:LINE));doc.roundedRect(x,y,w,20,2.5,2.5,"FD");
+    txt(doc,n(v),x+5,y+10.5,{b:1,s:17,c:hl?[255,255,255]:INK});txt(doc,l,x+5,y+16.3,{s:8,c:hl?[220,224,255]:MUTED})});return y+20}
+function calendar(doc,y){const cw=MW/7,ch=17,md=monthDays(),shift=(md[0].d.getDay()+6)%7;
+  ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"].forEach((d,i)=>txt(doc,d.toUpperCase(),ML+i*cw+cw/2,y,{s:7.5,b:1,c:MUTED,a:"center"}));y+=3;
+  md.forEach((x,i)=>{const p=i+shift,col=p%7,row=Math.floor(p/7),cx=ML+col*cw+0.8,cy=y+row*(ch+1.6),w=cw-1.6;
+    if(x.off){doc.setFillColor(246,247,249);doc.setDrawColor(246,247,249)}else{doc.setFillColor(...PCOL[x.statut]);doc.setDrawColor(...LINE)}
+    doc.setLineWidth(0.25);doc.roundedRect(cx,cy,w,ch,2,2,"FD");
+    txt(doc,x.d.getDate(),cx+2.5,cy+5.5,{b:1,s:10,c:x.off?[176,184,196]:INK});
+    const lab=x.off?(x.offLabel==="Férié"?"Férié":""):(x.statut==="½ site / ½ TT"?"½ site ½ TT":x.statut);
+    if(lab)txt(doc,lab,cx+2.5,cy+ch-3,{s:7,c:x.off?[160,168,180]:MUTED,b:x.statut!=="Sur site"&&!x.off})});
+  const rows=Math.ceil((md.length+shift)/7);return y+rows*(ch+1.6)}
+function sig(doc,y,boxes){const g=6,w=(MW-g)/2,h=40;boxes.forEach((b,i)=>{const x=ML+i*(w+g);
+  doc.setDrawColor(...LINE);doc.setLineWidth(0.3);doc.roundedRect(x,y,w,h,2.5,2.5,"S");
+  txt(doc,b.t.toUpperCase(),x+5,y+7,{s:7.5,b:1,c:ACC});txt(doc,b.n||"",x+5,y+13,{b:1,s:10.5});
+  txt(doc,"Date :",x+5,y+20,{s:8.5,c:MUTED});doc.setDrawColor(...LINE);doc.line(x+16,y+20.5,x+w-5,y+20.5);
+  txt(doc,"Signature :",x+5,y+27,{s:8.5,c:MUTED})})}
+function foot(doc,s){doc.setDrawColor(...LINE);doc.line(ML,284,ML+MW,284);txt(doc,s,ML,289,{s:7.5,c:MUTED});txt(doc,val("nom"),ML+MW,289,{s:7.5,c:MUTED,a:"right"})}
 function fileName(t){return t+"_"+periode().replace(" ","_")+"_"+(val("nom")||"consultant").replace(/\s+/g,"_")+".pdf"}
 
-function pdfCRA(){save();const doc=newDoc();if(!doc)return;header(doc,"COMPTE RENDU D'ACTIVITÉ");
-  let y=infoBlock(doc,30,[["Consultant",val("nom")],["Société",val("societe")],["Client",val("client")],["Mission",val("mission")],["Responsable",val("resp")]])+5;
-  const cols=[[15,28,"Date"],[43,27,"Jour"],[70,40,"Statut"],[110,25,"Temps"],[135,60,""]];
-  doc.setFillColor(...BLUE);doc.rect(15,y,180,6,"F");doc.setTextColor(255);doc.setFont("helvetica","bold");doc.setFontSize(9);
-  cols.forEach(c=>c[2]&&doc.text(c[2],c[0]+c[1]/2,y+4.2,{align:"center"}));doc.setTextColor(0);y+=6;
-  doc.setFont("helvetica","normal");doc.setFontSize(8.5);const rh=5;
-  monthDays().forEach(x=>{if(x.off){doc.setFillColor(235,235,235);doc.rect(15,y,180,rh,"F")}
-    else if(x.statut==="Télétravail"||x.statut==="½ site / ½ TT"){doc.setFillColor(226,239,218);doc.rect(15,y,180,rh,"F")}
-    doc.rect(15,y,180,rh);const t=x.off?"-":n(STATUTS[x.statut].t);
-    [[fmt(x.d)],[JOURS[x.d.getDay()]],[x.statut],[t]].forEach((v,i)=>doc.text(v[0],cols[i][0]+cols[i][1]/2,y+3.6,{align:"center"}));y+=rh});
-  y+=5;const t=totals();
-  const rec=[["Jours travaillés",t.trav],["dont télétravail",t.tt],["Congés payés",t.cp],["RTT",t.rtt],["Maladie / absence",t.mal+t.abs]];
-  doc.setFontSize(9);rec.forEach(([l,v],i)=>{const x=15+i*36;doc.setFillColor(217,225,242);doc.rect(x,y,36,6,"F");doc.rect(x,y,36,12);
-    doc.setFont("helvetica","bold");doc.text(l,x+18,y+4.2,{align:"center"});doc.setFontSize(11);doc.text(n(v),x+18,y+10.3,{align:"center"});doc.setFontSize(9)});
-  y+=18;sigBoxes(doc,y,[{title:"LE CONSULTANT",name:val("nom")},{title:"RESPONSABLE — BON POUR ACCORD",name:val("resp")}]);
-  doc.setFont("helvetica","italic");doc.setFontSize(8);doc.text("Merci de dater, signer et retourner ce CRA.",15,y+51);
+function pdfCRA(){save();const doc=newDoc();if(!doc)return;const t=totals();
+  head(doc,"Compte rendu d'activité");
+  let y=infos(doc,47,[["Consultant",val("nom")],["Client",val("client")],["Mission",val("mission")],["Responsable",val("resp")]]);
+  y=cards(doc,y+3,[["jours travaillés",t.trav,1],["sur site",t.site],["en télétravail",t.tt],["absences / congés",t.cp+t.rtt+t.mal+t.abs]])+10;
+  y=calendar(doc,y)+8;
+  sig(doc,y,[{t:"Consultant",n:val("nom")},{t:"Responsable — bon pour accord",n:val("resp")}]);
+  txt(doc,"Merci de dater, signer et retourner ce compte rendu.",ML,y+47,{i:1,s:8,c:MUTED});
+  foot(doc,"Compte rendu d'activité · "+periode());
   doc.save(fileName("CRA"))}
 
-function pdfTT(){save();const doc=newDoc();if(!doc)return;header(doc,"JOURS DE TÉLÉTRAVAIL");
-  let y=infoBlock(doc,30,[["Consultant",val("nom")],["Client",val("client")],["Mission",val("mission")],["Destinataire",val("resp")]])+8;
-  const L=ttList(),t=totals();
-  doc.setFont("helvetica","normal");doc.setFontSize(10);
-  doc.text(doc.splitTextToSize(`Pour information, j'ai été en télétravail les jours suivants pour ${periode()} (${n(t.tt)} jour(s)).`,180),15,y);y+=12;
-  doc.setFillColor(...BLUE);doc.rect(15,y,180,7,"F");doc.setTextColor(255);doc.setFont("helvetica","bold");
-  [["N°",25],["Date",65],["Jour",110],["Durée",165]].forEach(([h,x])=>doc.text(h,x,y+4.8,{align:"center"}));doc.setTextColor(0);y+=7;doc.setFont("helvetica","normal");
-  if(!L.length){doc.rect(15,y,180,7);doc.text("Aucun jour de télétravail ce mois-ci",105,y+4.8,{align:"center"});y+=7}
-  L.forEach((x,i)=>{if(y>275){doc.addPage();y=20}doc.rect(15,y,180,7);
-    const pres=x.statut==="Télétravail"?"Journée":"Demi-journée";
-    [[String(i+1),25],[fmt(x.d),65],[JOURS[x.d.getDay()],110],[pres,165]].forEach(([v,cx])=>doc.text(v,cx,y+4.8,{align:"center"}));y+=7});
-  doc.setFillColor(217,225,242);doc.rect(15,y,180,7,"F");doc.rect(15,y,180,7);doc.setFont("helvetica","bold");
-  doc.text("Total : "+n(t.tt)+" jour(s) de télétravail",105,y+4.8,{align:"center"});
+function pdfTT(){save();const doc=newDoc();if(!doc)return;const t=totals(),L=ttList();
+  head(doc,"Jours de télétravail");
+  let y=infos(doc,47,[["Consultant",val("nom")],["Client",val("client")],["Mission",val("mission")],["Destinataire",val("resp")]]);
+  y=cards(doc,y+3,[["jours en télétravail",t.tt,1],["jours sur site",t.site],["jours travaillés",t.trav]])+12;
+  txt(doc,"Pour information, j'ai été en télétravail les jours suivants :",ML,y,{s:10.5});y+=7;
+  if(!L.length){txt(doc,"Aucun jour de télétravail ce mois-ci.",ML,y+4,{i:1,c:MUTED})}
+  const g=6,w=(MW-g)/2,h=9,per=Math.ceil(L.length/2);
+  L.forEach((x,i)=>{const col=i<per?0:1,row=col?i-per:i,cx=ML+col*(w+g),cy=y+row*(h+2);
+    doc.setFillColor(...PCOL["Télétravail"]);doc.roundedRect(cx,cy,w,h,2,2,"F");
+    txt(doc,JOURS[x.d.getDay()]+" "+fmt(x.d),cx+4,cy+6,{b:1,s:10});
+    txt(doc,x.statut==="Télétravail"?"Journée":"Demi-journée",cx+w-4,cy+6,{s:8.5,c:[22,101,52],a:"right"})});
+  foot(doc,"Jours de télétravail · "+periode());
   doc.save(fileName("Jours_teletravail"))}
 
 /* ---------- init ---------- */
